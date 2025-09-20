@@ -1,0 +1,7 @@
+# requirements.txt
+numpy>=1.21.0
+sentence-transformers>=2.2.0
+scikit-learn>=1.0.0
+networkx>=2.8.0
+sqlite3  # Built into Python
+typing-extensions>=4.0.0

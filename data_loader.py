@@ -1,0 +1,422 @@
+"""
+Sekai Data Loader and Memory Extractor
+Intelligently parses chapter synopses to create character-specific memories
+"""
+
+import json
+import re
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
+from sekai_memory_system import MemoryType, RelationshipType, SekaiMemorySystem
+
+@dataclass
+class ExtractedMemory:
+    character_perspective: str
+    memory_type: MemoryType
+    relationship_type: RelationshipType
+    content: str
+    participants: List[str]
+    emotional_weight: float
+    importance: float
+    is_secret: bool
+    tags: List[str]
+
+class SekaiDataLoader:
+    """Intelligent data loader for Sekai chapter data"""
+    
+    def __init__(self):
+        self.character_names = [
+            "Byleth", "Dimitri", "Sylvain", "Annette", "Dedue", 
+            "Mercedes", "Felix", "Ashe"
+        ]
+        
+        # Patterns for identifying different types of content
+        self.secret_patterns = [
+            r"secret", r"affair", r"hidden", r"concealed", r"covert",
+            r"private", r"steamy", r"intimate", r"discrete", r"clandestine"
+        ]
+        
+        self.emotion_patterns = {
+            "positive": [r"happy", r"joy", r"excited", r"pleased", r"thrilled", r"satisfied"],
+            "negative": [r"angry", r"furious", r"disappointed", r"hurt", r"betrayed", r"upset"],
+            "neutral": [r"professional", r"casual", r"routine", r"standard"]
+        }
+        
+        self.relationship_indicators = {
+            "romantic": [r"kiss", r"passion", r"intimate", r"affair", r"attraction", r"chemistry"],
+            "professional": [r"office", r"work", r"colleague", r"corporate", r"meeting"],
+            "friendship": [r"friend", r"trust", r"support", r"loyalty", r"caring"]
+        }
+    
+    def load_chapter_data(self, file_path: str) -> List[Dict]:
+        """Load chapter data from JSON file"""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    
+    def extract_memories_from_chapter(self, chapter_data: Dict) -> List[ExtractedMemory]:
+        """Extract multiple character perspectives from a single chapter"""
+        chapter_num = chapter_data["chapter_number"]
+        synopsis = chapter_data["synopsis"]
+        
+        memories = []
+        
+        # Identify characters mentioned in the synopsis
+        mentioned_characters = self._identify_characters(synopsis)
+        
+        # Determine the primary perspective (usually the subject of the first sentence)
+        primary_character = self._identify_primary_character(synopsis, mentioned_characters)
+        
+        # Extract basic memory components
+        emotional_weight = self._calculate_emotional_weight(synopsis)
+        importance = self._calculate_importance(synopsis, chapter_num)
+        is_secret = self._is_secret_content(synopsis)
+        memory_type = self._determine_memory_type(synopsis)
+        relationship_type = self._determine_relationship_type(synopsis, mentioned_characters)
+        tags = self._extract_tags(synopsis)
+        
+        # Create primary memory (from main character's perspective)
+        if primary_character:
+            memories.append(ExtractedMemory(
+                character_perspective=primary_character,
+                memory_type=memory_type,
+                relationship_type=relationship_type,
+                content=synopsis,
+                participants=mentioned_characters,
+                emotional_weight=emotional_weight,
+                importance=importance,
+                is_secret=is_secret,
+                tags=tags
+            ))
+        
+        # Create perspective-specific memories for other characters involved
+        for character in mentioned_characters:
+            if character != primary_character:
+                char_emotional_weight = self._adjust_emotional_weight_for_character(
+                    emotional_weight, character, synopsis
+                )
+                char_memory_type = self._adjust_memory_type_for_character(
+                    memory_type, character, synopsis
+                )
+                
+                memories.append(ExtractedMemory(
+                    character_perspective=character,
+                    memory_type=char_memory_type,
+                    relationship_type=relationship_type,
+                    content=self._reframe_content_for_character(synopsis, character),
+                    participants=mentioned_characters,
+                    emotional_weight=char_emotional_weight,
+                    importance=importance * 0.8,  # Secondary perspective slightly less important
+                    is_secret=is_secret,
+                    tags=tags
+                ))
+        
+        return memories
+    
+    def _identify_characters(self, text: str) -> List[str]:
+        """Identify character names mentioned in the text"""
+        mentioned = []
+        for char_name in self.character_names:
+            if char_name in text:
+                mentioned.append(char_name)
+        return mentioned
+    
+    def _identify_primary_character(self, text: str, mentioned_chars: List[str]) -> Optional[str]:
+        """Identify the primary character (usually the subject of the first sentence)"""
+        if not mentioned_chars:
+            return None
+        
+        # Simple heuristic: first mentioned character is usually the primary one
+        first_positions = {}
+        for char in mentioned_chars:
+            pos = text.find(char)
+            if pos != -1:
+                first_positions[char] = pos
+        
+        if first_positions:
+            return min(first_positions.keys(), key=lambda x: first_positions[x])
+        return mentioned_chars[0]
+    
+    def _calculate_emotional_weight(self, text: str) -> float:
+        """Calculate emotional weight of the content (-1.0 to 1.0)"""
+        positive_score = 0
+        negative_score = 0
+        
+        text_lower = text.lower()
+        
+        for pattern in self.emotion_patterns["positive"]:
+            positive_score += len(re.findall(pattern, text_lower))
+        
+        for pattern in self.emotion_patterns["negative"]:
+            negative_score += len(re.findall(pattern, text_lower))
+        
+        # Normalize and return
+        total_emotional = positive_score + negative_score
+        if total_emotional == 0:
+            return 0.0
+        
+        return (positive_score - negative_score) / total_emotional
+    
+    def _calculate_importance(self, text: str, chapter_num: int) -> float:
+        """Calculate importance of the memory (0.0 to 1.0)"""
+        importance = 0.5  # Base importance
+        
+        text_lower = text.lower()
+        
+        # Secret/affair content is highly important
+        if self._is_secret_content(text):
+            importance += 0.3
+        
+        # First encounters are important
+        if chapter_num <= 10 and any(word in text_lower for word in ["first", "initial", "new", "steps into"]):
+            importance += 0.2
+        
+        # Confrontations and discoveries are important
+        if any(word in text_lower for word in ["confrontation", "discovers", "realizes", "catches"]):
+            importance += 0.3
+        
+        # Evidence and observations are important
+        if any(word in text_lower for word in ["evidence", "witness", "observes", "notices"]):
+            importance += 0.25
+        
+        return min(1.0, importance)
+    
+    def _is_secret_content(self, text: str) -> bool:
+        """Determine if content involves secrets"""
+        text_lower = text.lower()
+        for pattern in self.secret_patterns:
+            if re.search(pattern, text_lower):
+                return True
+        return False
+    
+    def _determine_memory_type(self, text: str) -> MemoryType:
+        """Determine the type of memory based on content"""
+        text_lower = text.lower()
+        
+        # Core memories: fundamental relationship changes
+        if any(word in text_lower for word in ["affair", "relationship", "bond", "connection"]):
+            return MemoryType.CORE
+        
+        # Procedural: how to do things, patterns of behavior
+        if any(word in text_lower for word in ["approach", "strategy", "method", "technique"]):
+            return MemoryType.PROCEDURAL
+        
+        # Semantic: facts and general knowledge
+        if any(word in text_lower for word in ["knows", "understands", "aware", "realizes"]):
+            return MemoryType.SEMANTIC
+        
+        # Resource: external information
+        if any(word in text_lower for word in ["memo", "email", "message", "information"]):
+            return MemoryType.RESOURCE
+        
+        # Default to episodic (specific events)
+        return MemoryType.EPISODIC
+    
+    def _determine_relationship_type(self, text: str, participants: List[str]) -> RelationshipType:
+        """Determine the relationship type based on content and participants"""
+        # World memory: general events, company announcements, etc.
+        if any(word in text.lower() for word in ["company", "office", "virus", "announcement", "general"]):
+            return RelationshipType.WORLD_MEMORY
+        
+        # Character-to-User: direct interactions (assuming Byleth is the "user" character)
+        if "Byleth" in participants and len(participants) == 2:
+            return RelationshipType.CHARACTER_TO_USER
+        
+        # Inter-Character: multiple characters interacting
+        return RelationshipType.INTER_CHARACTER
+    
+    def _extract_tags(self, text: str) -> List[str]:
+        """Extract relevant tags from the content"""
+        tags = []
+        text_lower = text.lower()
+        
+        # Location tags
+        if "office" in text_lower:
+            tags.append("office")
+        if "restaurant" in text_lower:
+            tags.append("restaurant")
+        if "hotel" in text_lower:
+            tags.append("hotel")
+        if "home" in text_lower or "apartment" in text_lower:
+            tags.append("private_space")
+        
+        # Event type tags
+        if any(word in text_lower for word in ["meeting", "encounter", "conversation"]):
+            tags.append("interaction")
+        if any(word in text_lower for word in ["planning", "strategy", "scheme"]):
+            tags.append("planning")
+        if any(word in text_lower for word in ["discovery", "evidence", "caught"]):
+            tags.append("revelation")
+        
+        # Relationship tags
+        if any(word in text_lower for word in ["affair", "secret", "intimate"]):
+            tags.append("secret_relationship")
+        if any(word in text_lower for word in ["professional", "work", "colleague"]):
+            tags.append("professional")
+        
+        return tags
+    
+    def _adjust_emotional_weight_for_character(self, base_weight: float, character: str, text: str) -> float:
+        """Adjust emotional weight based on character's perspective"""
+        # Character-specific emotional biases
+        character_biases = {
+            "Byleth": 0.1,      # Slightly more positive (manipulative confidence)
+            "Dimitri": -0.1,    # Slightly more negative (intensity/pessimism)
+            "Sylvain": 0.0,     # Neutral
+            "Annette": 0.3,     # Very positive (optimistic)
+            "Dedue": -0.2,      # More negative (cautious)
+            "Mercedes": 0.2,    # Positive (caring)
+            "Felix": -0.1,      # Slightly negative (cynical)
+            "Ashe": 0.1         # Slightly positive (hopeful)
+        }
+        
+        bias = character_biases.get(character, 0.0)
+        adjusted_weight = base_weight + bias
+        
+        # Specific adjustments based on content and character
+        text_lower = text.lower()
+        
+        if character == "Annette":
+            # Annette doesn't know about the affairs, so betrayal scenes are less negative for her
+            if "betrayal" in text_lower and "Sylvain" in text:
+                adjusted_weight = max(adjusted_weight, -0.2)
+        
+        elif character == "Dedue":
+            # Dedue is protective, so threats to Dimitri are very negative
+            if "Dimitri" in text and any(word in text_lower for word in ["threat", "danger", "risk"]):
+                adjusted_weight -= 0.3
+        
+        elif character == "Byleth":
+            # Byleth sees manipulation as success
+            if any(word in text_lower for word in ["manipulation", "control", "strategy"]):
+                adjusted_weight += 0.2
+        
+        return max(-1.0, min(1.0, adjusted_weight))
+    
+    def _adjust_memory_type_for_character(self, base_type: MemoryType, character: str, text: str) -> MemoryType:
+        """Adjust memory type based on character's perspective"""
+        
+        # Dedue tends to store observations as procedural (how to protect Dimitri)
+        if character == "Dedue" and "observes" in text.lower():
+            return MemoryType.PROCEDURAL
+        
+        # Byleth stores strategic information as procedural
+        if character == "Byleth" and any(word in text.lower() for word in ["strategy", "plan", "manipulation"]):
+            return MemoryType.PROCEDURAL
+        
+        # Annette stores relationship information as core memories
+        if character == "Annette" and "Sylvain" in text:
+            return MemoryType.CORE
+        
+        return base_type
+    
+    def _reframe_content_for_character(self, original_content: str, character: str) -> str:
+        """Reframe content from a specific character's perspective"""
+        # This is a simplified version - in practice, you might want to use an LLM
+        # to properly reframe the content from each character's viewpoint
+        
+        perspective_frames = {
+            "Dedue": f"[Observing] {original_content}",
+            "Annette": f"[Unaware of secrets] {original_content}",
+            "Felix": f"[Analytical view] {original_content}",
+            "Mercedes": f"[Caring perspective] {original_content}"
+        }
+        
+        return perspective_frames.get(character, original_content)
+
+
+class MemoryDataProcessor:
+    """Main processor for loading and converting Sekai data into memory system"""
+    
+    def __init__(self, memory_system: SekaiMemorySystem):
+        self.memory_system = memory_system
+        self.data_loader = SekaiDataLoader()
+    
+    def process_json_file(self, file_path: str) -> Dict[str, int]:
+        """Process the memory_data.json file and load into memory system"""
+        
+        # Load chapter data
+        chapter_data = self.data_loader.load_chapter_data(file_path)
+        
+        stats = {
+            "chapters_processed": 0,
+            "memories_created": 0,
+            "characters_involved": set()
+        }
+        
+        # Process each chapter
+        for chapter_info in chapter_data:
+            extracted_memories = self.data_loader.extract_memories_from_chapter(chapter_info)
+            
+            # Add each extracted memory to the system
+            for memory_data in extracted_memories:
+                memory_id = self.memory_system.add_memory(
+                    character_perspective=memory_data.character_perspective,
+                    memory_type=memory_data.memory_type,
+                    relationship_type=memory_data.relationship_type,
+                    content=memory_data.content,
+                    chapter=chapter_info["chapter_number"],
+                    participants=memory_data.participants,
+                    emotional_weight=memory_data.emotional_weight,
+                    importance=memory_data.importance,
+                    is_secret=memory_data.is_secret
+                )
+                
+                stats["memories_created"] += 1
+                stats["characters_involved"].add(memory_data.character_perspective)
+            
+            stats["chapters_processed"] += 1
+        
+        # Convert set to list for JSON serialization
+        stats["characters_involved"] = list(stats["characters_involved"])
+        
+        return stats
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize memory system
+    memory_system = SekaiMemorySystem()
+    
+    # Initialize processor
+    processor = MemoryDataProcessor(memory_system)
+    
+    # Process the data file
+    stats = processor.process_json_file("memory_data.json")
+    
+    print(f"Processing complete!")
+    print(f"Chapters processed: {stats['chapters_processed']}")
+    print(f"Memories created: {stats['memories_created']}")
+    print(f"Characters involved: {stats['characters_involved']}")
+    
+    # Test some queries
+    print("\n=== Testing Memory Retrieval ===")
+    
+    # Test 1: Byleth's relationship with Dimitri
+    byleth_dimitri_memories = memory_system.retrieve_memories(
+        "Byleth Dimitri relationship affair", 
+        character_perspective="Byleth",
+        top_k=3
+    )
+    print(f"\nByleth's memories about Dimitri: {len(byleth_dimitri_memories)} found")
+    for memory in byleth_dimitri_memories:
+        print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
+    
+    # Test 2: Dedue's observations
+    dedue_memories = memory_system.retrieve_memories(
+        "observation evidence discovery",
+        character_perspective="Dedue",
+        top_k=3
+    )
+    print(f"\nDedue's observations: {len(dedue_memories)} found")
+    for memory in dedue_memories:
+        print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
+    
+    # Test 3: Secret affairs
+    secret_memories = memory_system.retrieve_memories(
+        "secret affair intimate",
+        relationship_type=RelationshipType.INTER_CHARACTER,
+        top_k=5
+    )
+    print(f"\nSecret affair memories: {len(secret_memories)} found")
+    for memory in secret_memories:
+        print(f"  {memory.character_perspective} - Chapter {memory.chapter}: Secret={memory.is_secret}")
