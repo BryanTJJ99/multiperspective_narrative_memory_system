@@ -1,8 +1,35 @@
+## Virtualenvs
 venv/
 .venv/
-.log
-.npy
-.pyc
-.db
-.DS_Store
+env/
+ENV/
+
+## Python cache / bytecode
+*.py[cod]
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+## Logs
+*.log
+
+## Data / DBs / outputs
+*.npy
+*.db
+*.sqlite3
+output/
+sample_memory_data.json
+sekai_evaluation_report*.html
+
+## Jupyter
+.ipynb_checkpoints/
+
+## Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# HuggingFace / model caches
+.cache/huggingface/
+.cache/torch/

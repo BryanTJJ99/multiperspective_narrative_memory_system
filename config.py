@@ -8,7 +8,7 @@ from typing import Dict, Any
 @dataclass
 class MemoryConfig:
     # Database settings
-    db_path: str = "sekai_memory.db"
+    db_path: str = "demo_sekai_memory.db"
     
     # Embedding model settings
     embedding_model: str = "all-MiniLM-L6-v2"
