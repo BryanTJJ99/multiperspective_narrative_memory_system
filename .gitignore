@@ -1,2 +1,8 @@
 venv/
 .venv/
+.log
+.npy
+.pyc
+.db
+.DS_Store
+__pycache__/
