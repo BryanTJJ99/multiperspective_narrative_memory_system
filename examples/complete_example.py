@@ -9,8 +9,8 @@ import os
 from datetime import datetime
 
 # Import all necessary components
-from sekai_memory_system import SekaiMemorySystem, MemoryType, RelationshipType
-from data_loader import MemoryDataProcessor
+from src.sekai_memory_system import SekaiMemorySystem, MemoryType, RelationshipType
+from src.data_loader import MemoryDataProcessor
 from evaluation_pipeline import ComprehensiveEvaluationPipeline
 
 def create_sample_data():

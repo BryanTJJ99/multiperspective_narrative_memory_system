@@ -17,7 +17,7 @@ import seaborn as sns
 from collections import defaultdict, Counter
 import networkx as nx
 
-from sekai_memory_system import SekaiMemorySystem, Memory, MemoryType, RelationshipType
+from src.sekai_memory_system import SekaiMemorySystem, Memory, MemoryType, RelationshipType
 
 @dataclass
 class EvaluationResult:
@@ -869,8 +869,8 @@ if __name__ == "__main__":
     # This would typically be run after loading your memory_data.json
     # For demonstration, we'll create a minimal example
     
-    from sekai_memory_system import SekaiMemorySystem
-    from data_loader import MemoryDataProcessor
+    from src.sekai_memory_system import SekaiMemorySystem
+    from src.data_loader import MemoryDataProcessor
     
     # Initialize system
     memory_system = SekaiMemorySystem()

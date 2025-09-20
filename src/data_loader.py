@@ -7,7 +7,7 @@ import json
 import re
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-from sekai_memory_system import MemoryType, RelationshipType, SekaiMemorySystem
+from src.sekai_memory_system import MemoryType, RelationshipType, SekaiMemorySystem
 
 @dataclass
 class ExtractedMemory:
