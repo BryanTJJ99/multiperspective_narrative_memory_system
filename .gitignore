@@ -17,6 +17,7 @@ __pycache__/
 ## Data / DBs / outputs
 *.npy
 *.db
+demo_sekai_memory.db
 *.sqlite3
 output/
 sample_memory_data.json
