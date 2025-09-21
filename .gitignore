@@ -1,36 +1,84 @@
-## Virtualenvs
+# .gitignore
+# Security: Never commit environment files with API keys
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 venv/
-.venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
-## Python cache / bytecode
-*.py[cod]
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-.cache/
-
-## Logs
-*.log
-
-## Data / DBs / outputs
-*.npy
-*.db
-demo_sekai_memory.db
-*.sqlite3
-output/
-sample_memory_data.json
-sekai_evaluation_report*.html
-
-## Jupyter
-.ipynb_checkpoints/
-
-## Editor / OS
-.DS_Store
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# HuggingFace / model caches
-.cache/huggingface/
-.cache/torch/
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Output files
+output/
+reports/
+*.html
+!README.html
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# API keys and secrets (extra protection)
+*api_key*
+*secret*
+*token*
+keys/
+secrets/
+
+# Backup files
+*.bak
+*.backup

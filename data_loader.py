@@ -1,13 +1,25 @@
+# data_loader.py
 """
-Sekai Data Loader and Memory Extractor
+Enhanced Data Loader and Memory Extractor with LLM Integration
 Intelligently parses chapter synopses to create character-specific memories
+Now includes LLM-based content reframing for authentic character perspectives
 """
 
 import json
 import re
+import asyncio
+import os
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-from src.sekai_memory_system import MemoryType, RelationshipType, SekaiMemorySystem
+from sekai_memory_system import MemoryType, RelationshipType
+from env_config import env_config
+
+# OpenAI integration
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 @dataclass
 class ExtractedMemory:
@@ -22,13 +34,25 @@ class ExtractedMemory:
     tags: List[str]
 
 class SekaiDataLoader:
-    """Intelligent data loader for Sekai chapter data"""
+    """Enhanced intelligent data loader for chapter data with LLM capabilities"""
     
-    def __init__(self):
+    def __init__(self, openai_api_key: str = None, llm_model: str = None):
         self.character_names = [
             "Byleth", "Dimitri", "Sylvain", "Annette", "Dedue", 
             "Mercedes", "Felix", "Ashe"
         ]
+        
+        # LLM Configuration using environment settings
+        self.openai_api_key = openai_api_key or env_config.openai_api_key
+        self.llm_model = llm_model or env_config.openai_model
+        self.temperature = env_config.openai_temperature
+        self.max_tokens = env_config.openai_max_tokens
+        
+        if self.openai_api_key and OPENAI_AVAILABLE:
+            openai.api_key = self.openai_api_key
+            self.llm_enabled = True
+        else:
+            self.llm_enabled = False
         
         # Patterns for identifying different types of content
         self.secret_patterns = [
@@ -47,14 +71,53 @@ class SekaiDataLoader:
             "professional": [r"office", r"work", r"colleague", r"corporate", r"meeting"],
             "friendship": [r"friend", r"trust", r"support", r"loyalty", r"caring"]
         }
+        
+        # Character personality context for LLM reframing
+        self.character_contexts = {
+            "Byleth": {
+                "personality_traits": ["manipulative", "strategic", "charming", "calculating"],
+                "perspective_style": "analytical and self-serving",
+                "emotional_default": "controlled manipulation",
+                "secrets": ["affair with Dimitri", "affair with Sylvain"],
+                "voice_style": "calculating internal monologue"
+            },
+            "Dimitri": {
+                "personality_traits": ["intense", "passionate", "possessive", "loyal"],
+                "perspective_style": "emotionally driven and focused",
+                "emotional_default": "intense emotional responses",
+                "secrets": ["affair with Byleth"],
+                "voice_style": "passionate and sometimes obsessive"
+            },
+            "Sylvain": {
+                "personality_traits": ["charming", "flirtatious", "conflicted", "charismatic"],
+                "perspective_style": "socially aware but internally conflicted",
+                "emotional_default": "charm masking inner turmoil",
+                "secrets": ["affair with Byleth"],
+                "voice_style": "smooth exterior with underlying tension"
+            },
+            "Annette": {
+                "personality_traits": ["trusting", "optimistic", "caring", "gradually suspicious"],
+                "perspective_style": "positive but increasingly observant",
+                "emotional_default": "trusting optimism turning to doubt",
+                "secrets": [],
+                "voice_style": "warm but becoming more questioning"
+            },
+            "Dedue": {
+                "personality_traits": ["observant", "protective", "methodical", "loyal"],
+                "perspective_style": "protective analysis and careful observation",
+                "emotional_default": "controlled concern for Dimitri",
+                "secrets": ["knows about Byleth-Dimitri affair"],
+                "voice_style": "careful, protective observations"
+            }
+        }
     
     def load_chapter_data(self, file_path: str) -> List[Dict]:
         """Load chapter data from JSON file"""
         with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     
-    def extract_memories_from_chapter(self, chapter_data: Dict) -> List[ExtractedMemory]:
-        """Extract multiple character perspectives from a single chapter"""
+    async def extract_memories_from_chapter(self, chapter_data: Dict) -> List[ExtractedMemory]:
+        """Extract multiple character perspectives from a single chapter with LLM enhancement"""
         chapter_num = chapter_data["chapter_number"]
         synopsis = chapter_data["synopsis"]
         
@@ -76,11 +139,17 @@ class SekaiDataLoader:
         
         # Create primary memory (from main character's perspective)
         if primary_character:
+            primary_content = synopsis
+            if self.llm_enabled:
+                primary_content = await self._llm_reframe_content(
+                    synopsis, primary_character, mentioned_characters, is_secret
+                )
+            
             memories.append(ExtractedMemory(
                 character_perspective=primary_character,
                 memory_type=memory_type,
                 relationship_type=relationship_type,
-                content=synopsis,
+                content=primary_content,
                 participants=mentioned_characters,
                 emotional_weight=emotional_weight,
                 importance=importance,
@@ -98,11 +167,19 @@ class SekaiDataLoader:
                     memory_type, character, synopsis
                 )
                 
+                # Enhanced content reframing with LLM
+                if self.llm_enabled:
+                    char_content = await self._llm_reframe_content(
+                        synopsis, character, mentioned_characters, is_secret
+                    )
+                else:
+                    char_content = self._reframe_content_for_character(synopsis, character)
+                
                 memories.append(ExtractedMemory(
                     character_perspective=character,
                     memory_type=char_memory_type,
                     relationship_type=relationship_type,
-                    content=self._reframe_content_for_character(synopsis, character),
+                    content=char_content,
                     participants=mentioned_characters,
                     emotional_weight=char_emotional_weight,
                     importance=importance * 0.8,  # Secondary perspective slightly less important
@@ -111,6 +188,63 @@ class SekaiDataLoader:
                 ))
         
         return memories
+    
+    async def _llm_reframe_content(self, original_content: str, character: str, 
+                                  participants: List[str], is_secret: bool) -> str:
+        """Use LLM to reframe content from a specific character's perspective"""
+        if not self.llm_enabled:
+            return self._reframe_content_for_character(original_content, character)
+        
+        char_context = self.character_contexts.get(character, {})
+        
+        prompt = f"""
+Rewrite this narrative memory from {character}'s perspective:
+
+Original: "{original_content}"
+
+Character Context:
+- Name: {character}
+- Personality: {', '.join(char_context.get('personality_traits', []))}
+- Perspective style: {char_context.get('perspective_style', 'observational')}
+- Voice style: {char_context.get('voice_style', 'neutral')}
+- Known secrets: {char_context.get('secrets', [])}
+- Other characters present: {participants}
+- This is a secret event: {is_secret}
+
+Guidelines:
+1. Write in {character}'s voice and internal perspective
+2. Include their emotional interpretation and reaction
+3. Show what they would notice, think, or feel
+4. Reflect their personality in the language and focus
+5. Consider their knowledge level about secrets
+6. Keep the core events but show their unique viewpoint
+7. Use first-person internal thoughts when appropriate
+
+Return only the reframed memory text, staying true to the character.
+"""
+        
+        try:
+            response = await openai.ChatCompletion.acreate(
+                model=self.llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a narrative perspective specialist who rewrites scenes from different character viewpoints."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=300,
+                temperature=0.4
+            )
+            
+            reframed_content = response.choices[0].message.content.strip()
+            
+            # Clean up any quotation marks that might wrap the response
+            if reframed_content.startswith('"') and reframed_content.endswith('"'):
+                reframed_content = reframed_content[1:-1]
+            
+            return reframed_content
+            
+        except Exception as e:
+            print(f"LLM reframing failed for {character}: {e}")
+            return self._reframe_content_for_character(original_content, character)
     
     def _identify_characters(self, text: str) -> List[str]:
         """Identify character names mentioned in the text"""
@@ -310,28 +444,29 @@ class SekaiDataLoader:
         return base_type
     
     def _reframe_content_for_character(self, original_content: str, character: str) -> str:
-        """Reframe content from a specific character's perspective"""
-        # This is a simplified version - in practice, you might want to use an LLM
-        # to properly reframe the content from each character's viewpoint
+        """Reframe content from a specific character's perspective (fallback method)"""
+        # This is a simplified version for when LLM is not available
         
         perspective_frames = {
-            "Dedue": f"[Observing] {original_content}",
-            "Annette": f"[Unaware of secrets] {original_content}",
-            "Felix": f"[Analytical view] {original_content}",
-            "Mercedes": f"[Caring perspective] {original_content}"
+            "Dedue": f"[Observing protectively] {original_content}",
+            "Annette": f"[Unaware of deceptions] {original_content}",
+            "Felix": f"[Analytical assessment] {original_content}",
+            "Mercedes": f"[Caring observation] {original_content}",
+            "Dimitri": f"[Intense focus] {original_content}",
+            "Sylvain": f"[Charming exterior] {original_content}"
         }
         
         return perspective_frames.get(character, original_content)
 
 
 class MemoryDataProcessor:
-    """Main processor for loading and converting Sekai data into memory system"""
+    """Enhanced processor for loading and converting data into memory system"""
     
-    def __init__(self, memory_system: SekaiMemorySystem):
+    def __init__(self, memory_system, openai_api_key: str = None):
         self.memory_system = memory_system
-        self.data_loader = SekaiDataLoader()
+        self.data_loader = SekaiDataLoader(openai_api_key)
     
-    def process_json_file(self, file_path: str) -> Dict[str, int]:
+    async def process_json_file(self, file_path: str) -> Dict[str, int]:
         """Process the memory_data.json file and load into memory system"""
         
         # Load chapter data
@@ -340,12 +475,13 @@ class MemoryDataProcessor:
         stats = {
             "chapters_processed": 0,
             "memories_created": 0,
-            "characters_involved": set()
+            "characters_involved": set(),
+            "llm_enhanced": self.data_loader.llm_enabled
         }
         
         # Process each chapter
         for chapter_info in chapter_data:
-            extracted_memories = self.data_loader.extract_memories_from_chapter(chapter_info)
+            extracted_memories = await self.data_loader.extract_memories_from_chapter(chapter_info)
             
             # Add each extracted memory to the system
             for memory_data in extracted_memories:
@@ -374,49 +510,47 @@ class MemoryDataProcessor:
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize memory system
-    memory_system = SekaiMemorySystem()
+    import asyncio
     
-    # Initialize processor
-    processor = MemoryDataProcessor(memory_system)
+    async def main():
+        # Initialize memory system
+        from dynamic_memory_system import DynamicMemorySystem
+        memory_system = DynamicMemorySystem(openai_api_key="your-openai-api-key")
+        
+        # Initialize enhanced processor
+        processor = MemoryDataProcessor(memory_system, openai_api_key="your-openai-api-key")
+        
+        # Process the data file
+        stats = await processor.process_json_file("memory_data.json")
+        
+        print(f"Enhanced processing complete!")
+        print(f"Chapters processed: {stats['chapters_processed']}")
+        print(f"Memories created: {stats['memories_created']}")
+        print(f"Characters involved: {stats['characters_involved']}")
+        print(f"LLM enhanced: {stats['llm_enhanced']}")
+        
+        # Test some queries
+        print("\n=== Testing Enhanced Memory Retrieval ===")
+        
+        # Test 1: Byleth's relationship with Dimitri
+        byleth_dimitri_memories = memory_system.retrieve_memories(
+            "Byleth Dimitri relationship affair", 
+            character_perspective="Byleth",
+            top_k=3
+        )
+        print(f"\nByleth's memories about Dimitri: {len(byleth_dimitri_memories)} found")
+        for memory in byleth_dimitri_memories:
+            print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
+        
+        # Test 2: Dedue's observations
+        dedue_memories = memory_system.retrieve_memories(
+            "observation evidence discovery",
+            character_perspective="Dedue",
+            top_k=3
+        )
+        print(f"\nDedue's observations: {len(dedue_memories)} found")
+        for memory in dedue_memories:
+            print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
     
-    # Process the data file
-    stats = processor.process_json_file("memory_data.json")
-    
-    print(f"Processing complete!")
-    print(f"Chapters processed: {stats['chapters_processed']}")
-    print(f"Memories created: {stats['memories_created']}")
-    print(f"Characters involved: {stats['characters_involved']}")
-    
-    # Test some queries
-    print("\n=== Testing Memory Retrieval ===")
-    
-    # Test 1: Byleth's relationship with Dimitri
-    byleth_dimitri_memories = memory_system.retrieve_memories(
-        "Byleth Dimitri relationship affair", 
-        character_perspective="Byleth",
-        top_k=3
-    )
-    print(f"\nByleth's memories about Dimitri: {len(byleth_dimitri_memories)} found")
-    for memory in byleth_dimitri_memories:
-        print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
-    
-    # Test 2: Dedue's observations
-    dedue_memories = memory_system.retrieve_memories(
-        "observation evidence discovery",
-        character_perspective="Dedue",
-        top_k=3
-    )
-    print(f"\nDedue's observations: {len(dedue_memories)} found")
-    for memory in dedue_memories:
-        print(f"  Chapter {memory.chapter}: {memory.content[:100]}...")
-    
-    # Test 3: Secret affairs
-    secret_memories = memory_system.retrieve_memories(
-        "secret affair intimate",
-        relationship_type=RelationshipType.INTER_CHARACTER,
-        top_k=5
-    )
-    print(f"\nSecret affair memories: {len(secret_memories)} found")
-    for memory in secret_memories:
-        print(f"  {memory.character_perspective} - Chapter {memory.chapter}: Secret={memory.is_secret}")
+    # Run the async example
+    # asyncio.run(main())

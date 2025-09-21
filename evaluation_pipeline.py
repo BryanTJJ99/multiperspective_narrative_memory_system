@@ -1,3 +1,4 @@
+# evaluation_pipeline.py
 """
 Comprehensive Memory Evaluation Pipeline
 Answers the three key evaluation questions:
@@ -17,7 +18,7 @@ import seaborn as sns
 from collections import defaultdict, Counter
 import networkx as nx
 
-from src.sekai_memory_system import SekaiMemorySystem, Memory, MemoryType, RelationshipType
+from sekai_memory_system import Memory, MemoryType, RelationshipType
 
 @dataclass
 class EvaluationResult:
@@ -39,7 +40,7 @@ class TestCase:
 class MemoryRetrievalEvaluator:
     """Evaluates precision and recall of memory retrieval (Question A)"""
     
-    def __init__(self, memory_system: SekaiMemorySystem):
+    def __init__(self, memory_system):
         self.memory_system = memory_system
         
     def create_test_cases(self) -> List[TestCase]:
@@ -178,7 +179,7 @@ class MemoryRetrievalEvaluator:
 class MemoryConsistencyEvaluator:
     """Evaluates memory consistency across time, characters, and world state (Question B)"""
     
-    def __init__(self, memory_system: SekaiMemorySystem):
+    def __init__(self, memory_system):
         self.memory_system = memory_system
     
     def evaluate_temporal_consistency(self) -> EvaluationResult:
@@ -365,7 +366,7 @@ class MemoryConsistencyEvaluator:
 class AdditionalMetricsEvaluator:
     """Additional evaluation metrics (Question C)"""
     
-    def __init__(self, memory_system: SekaiMemorySystem):
+    def __init__(self, memory_system):
         self.memory_system = memory_system
     
     def evaluate_character_distinctiveness(self) -> EvaluationResult:
@@ -547,7 +548,11 @@ class AdditionalMetricsEvaluator:
 class ComprehensiveEvaluationPipeline:
     """Main evaluation pipeline that orchestrates all evaluations"""
     
-    def __init__(self, memory_system: SekaiMemorySystem):
+    def __init__(self, memory_system):
+        """
+        Initialize evaluation pipeline with any memory system
+        Supports both SekaiMemorySystem and DynamicMemorySystem
+        """
         self.memory_system = memory_system
         self.retrieval_evaluator = MemoryRetrievalEvaluator(memory_system)
         self.consistency_evaluator = MemoryConsistencyEvaluator(memory_system)
@@ -659,7 +664,7 @@ class ComprehensiveEvaluationPipeline:
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Sekai Memory System Evaluation Report</title>
+            <title>Narrative Memory System Evaluation Report</title>
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }}
                 .container {{ max-width: 1200px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }}
@@ -682,7 +687,7 @@ class ComprehensiveEvaluationPipeline:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🧠 Sekai Memory System Evaluation Report</h1>
+                    <h1>🧠 Narrative Memory System Evaluation Report</h1>
                     <p>Generated on {results['timestamp']}</p>
                 </div>
                 
@@ -869,8 +874,8 @@ if __name__ == "__main__":
     # This would typically be run after loading your memory_data.json
     # For demonstration, we'll create a minimal example
     
-    from src.sekai_memory_system import SekaiMemorySystem
-    from src.data_loader import MemoryDataProcessor
+    from sekai_memory_system import SekaiMemorySystem
+    from data_loader import MemoryDataProcessor
     
     # Initialize system
     memory_system = SekaiMemorySystem()
