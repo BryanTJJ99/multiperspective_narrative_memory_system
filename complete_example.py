@@ -15,7 +15,7 @@ from memory_system import MemorySystem, MemoryDataProcessor, ComprehensiveEvalua
 from env_config import env_config
 
 def create_sample_data():
-    """Create sample data for demonstration (subset of your actual data)"""
+    """Create sample data for demonstration (subset of actual data)"""
     sample_data = [
         {
             "chapter_number": 1,
@@ -129,7 +129,7 @@ async def demonstrate_enhanced_system_with_evaluation():
         print("   📚 Using sample data (add memory_data.json for your full story)")
     
     # Process data using enhanced system with environment configuration
-    processor = MemoryDataProcessor(memory_system)  # Uses environment config automatically
+    processor = MemoryDataProcessor(memory_system)  # No API key needed - uses env config
     stats = await processor.process_json_file(data_file)
     
     print(f"   ✅ Processed {stats['chapters_processed']} chapters")
@@ -166,53 +166,6 @@ async def demonstrate_enhanced_system_with_evaluation():
     
     new_chapter = {
         "chapter_number": next_chapter_num,
-        "synopsis": "Dr. Elena Vasquez arrives as the new head of security, immediately noticing inconsistencies in employee behavior patterns. Her analytical mind quickly identifies the complex web of relationships, particularly focusing on Byleth's interactions. 'Interesting dynamics here,' she notes, making mental notes of who avoids eye contact with whom."
-    }
-    
-    print(f"   📝 Adding new chapter {new_chapter['chapter_number']} with new character...")
-    integration_result = await memory_system.add_new_chapter(new_chapter, auto_integrate=True)
-    print(f"   📊 Base characters: {len(memory_system.character_profiles)}")
-    print(f"   🤖 LLM Integration: {llm_status}{model_info}")
-    print(f"   📁 Auto-integration: Enabled")
-    print(f"   👁 File watching: {'Enabled' if memory_system.watch_directory else 'Disabled'}")
-    
-    # Step 2: Load initial narrative data
-    print("\n2️⃣  Loading Initial Narrative Data with LLM Enhancement...")
-    
-    # Check if user provided their actual data
-    data_file = "memory_data.json" if os.path.exists("memory_data.json") else create_sample_data()
-    
-    if data_file == "memory_data.json":
-        print("   📚 Using your actual memory_data.json file")
-    else:
-        print("   📚 Using sample data (add memory_data.json for your full story)")
-    
-    # Process data using enhanced system
-    processor = MemoryDataProcessor(memory_system, openai_api_key)
-    stats = await processor.process_json_file(data_file)
-    
-    print(f"   ✅ Processed {stats['chapters_processed']} chapters")
-    print(f"   ✅ Created {stats['memories_created']} memories")
-    print(f"   ✅ Characters: {', '.join(stats['characters_involved'])}")
-    print(f"   🤖 LLM Enhanced: {stats['llm_enhanced']}")
-    
-    # Step 3: Run comprehensive evaluation on enhanced system
-    print("\n3️⃣  Running Comprehensive Evaluation...")
-    
-    evaluator = ComprehensiveEvaluationPipeline(memory_system)
-    results = evaluator.run_full_evaluation()
-    
-    print(f"   🎯 Overall System Score: {results['overall_score']:.3f}")
-    print(f"   📈 Retrieval Accuracy: {results['question_a_retrieval']['overall_score']:.3f}")
-    print(f"   🔄 Memory Consistency: {results['question_b_consistency']['overall_score']:.3f}")
-    print(f"   ⚡ Additional Metrics: {results['question_c_additional']['overall_score']:.3f}")
-    
-    # Step 4: Demonstrate enhanced dynamic capabilities
-    print("\n4️⃣  Demonstrating Enhanced Dynamic Growth Capabilities...")
-    
-    # Add a new chapter with a new character
-    new_chapter = {
-        "chapter_number": max([int(ch) for ch in memory_system.narrative_timeline.keys()]) + 1,
         "synopsis": "Dr. Elena Vasquez arrives as the new head of security, immediately noticing inconsistencies in employee behavior patterns. Her analytical mind quickly identifies the complex web of relationships, particularly focusing on Byleth's interactions. 'Interesting dynamics here,' she notes, making mental notes of who avoids eye contact with whom."
     }
     

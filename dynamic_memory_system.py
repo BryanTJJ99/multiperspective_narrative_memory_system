@@ -431,7 +431,7 @@ Return JSON:
         
         # Extract memories from new chapter
         data_loader = SekaiDataLoader()
-        extracted_memories = data_loader.extract_memories_from_chapter(chapter_data)
+        extracted_memories = await data_loader.extract_memories_from_chapter(chapter_data)
         
         # Identify new characters
         mentioned_characters = set()
@@ -908,12 +908,19 @@ Return JSON:
                                     # Multiple chapters
                                     for chapter_data in data:
                                         if self._is_new_chapter(chapter_data):
-                                            # Use async context for LLM features
-                                            asyncio.create_task(self.add_new_chapter(chapter_data))
+                                            # Run async function in new event loop
+                                            loop = asyncio.new_event_loop()
+                                            asyncio.set_event_loop(loop)
+                                            loop.run_until_complete(self.add_new_chapter(chapter_data))
+                                            loop.close()
                                 elif isinstance(data, dict) and 'chapter_number' in data:
                                     # Single chapter
                                     if self._is_new_chapter(data):
-                                        asyncio.create_task(self.add_new_chapter(data))
+                                        # Run async function in new event loop
+                                        loop = asyncio.new_event_loop()
+                                        asyncio.set_event_loop(loop)
+                                        loop.run_until_complete(self.add_new_chapter(data))
+                                        loop.close()
                                         
                             except Exception as e:
                                 logger.error(f"Error processing file {json_file}: {e}")
