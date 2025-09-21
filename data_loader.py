@@ -224,14 +224,18 @@ Return only the reframed memory text, staying true to the character.
 """
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            # Updated for OpenAI v1.0+ API
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=self.openai_api_key)
+            
+            response = await client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
                     {"role": "system", "content": "You are a narrative perspective specialist who rewrites scenes from different character viewpoints."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=300,
-                temperature=0.4
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
             )
             
             reframed_content = response.choices[0].message.content.strip()

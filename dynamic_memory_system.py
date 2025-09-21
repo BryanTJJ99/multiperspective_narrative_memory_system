@@ -73,9 +73,10 @@ class LLMConfig:
         self.temperature = temperature if temperature is not None else env_config.openai_temperature
         self.max_tokens = env_config.openai_max_tokens
         
+        # Updated for OpenAI v1.0+ - no need to set global api_key
         if self.api_key and OPENAI_AVAILABLE:
-            openai.api_key = self.api_key
             self.enabled = True
+            logger.info(f"LLM features enabled with model: {self.model}")
         else:
             self.enabled = False
             if not self.api_key:
@@ -203,7 +204,11 @@ Focus on:
 """
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            # Updated for OpenAI v1.0+ API
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=self.llm_config.api_key)
+            
+            response = await client.chat.completions.create(
                 model=self.llm_config.model,
                 messages=[
                     {"role": "system", "content": "You are an expert narrative psychologist analyzing fictional characters."},
@@ -291,7 +296,11 @@ Return JSON:
 """
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            # Updated for OpenAI v1.0+ API
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=self.llm_config.api_key)
+            
+            response = await client.chat.completions.create(
                 model=self.llm_config.model,
                 messages=[
                     {"role": "system", "content": "You are a narrative consolidation specialist."},
@@ -348,7 +357,11 @@ Return JSON:
 """
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            # Updated for OpenAI v1.0+ API
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=self.llm_config.api_key)
+            
+            response = await client.chat.completions.create(
                 model=self.llm_config.model,
                 messages=[
                     {"role": "system", "content": "You are a narrative consistency analyst."},

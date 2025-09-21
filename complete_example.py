@@ -152,8 +152,20 @@ async def demonstrate_enhanced_system_with_evaluation():
     print("\n4️⃣  Demonstrating Enhanced Dynamic Growth Capabilities...")
     
     # Add a new chapter with a new character
+    # Fix: Handle empty narrative timeline
+    existing_chapters = list(memory_system.narrative_timeline.keys())
+    if existing_chapters:
+        next_chapter_num = max(existing_chapters) + 1
+    else:
+        # Check memories for chapter numbers as fallback
+        all_memories = list(memory_system.memories.values())
+        if all_memories:
+            next_chapter_num = max(m.chapter for m in all_memories) + 1
+        else:
+            next_chapter_num = 51  # Default starting point
+    
     new_chapter = {
-        "chapter_number": max([int(ch) for ch in memory_system.narrative_timeline.keys()]) + 1,
+        "chapter_number": next_chapter_num,
         "synopsis": "Dr. Elena Vasquez arrives as the new head of security, immediately noticing inconsistencies in employee behavior patterns. Her analytical mind quickly identifies the complex web of relationships, particularly focusing on Byleth's interactions. 'Interesting dynamics here,' she notes, making mental notes of who avoids eye contact with whom."
     }
     
